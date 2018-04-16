@@ -1,0 +1,3 @@
+[submodule "arsenal_pyclient"]
+	path = arsenal_pyclient
+	url = ssh://git@git.stratux.us:62315/redteam/Arsenal/arsenal_pyclient.git
