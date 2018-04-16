@@ -1,3 +1,7 @@
+"""
+A module providing useful functionality for slackbots.
+"""
+import os
 import logging
 import time
 import threading
@@ -12,9 +16,27 @@ class SlackBot(object):
     _logger = logging.getLogger(__name__)
     _logger.addHandler(_handler)
     _logger.setLevel('INFO')
-    def __init__(self, api_token):
+
+    def __init__(self, **kwargs):
+        api_token = self._get_token('slack_token_file', **kwargs)
+
+        # Initialize slack client
         self.slack_client = SlackClient(api_token)
         self._init_bot_id()
+
+    def _get_token(self, token_file=None, **kwargs):
+        """
+        Attempt to fetch a token based on kwargs.
+        """
+        # Allow token to be passed as argument
+        api_token = kwargs.get('slack_token')
+
+        # Attempt to read token from file
+        if token_file and os.path.exists(token_file):
+            with open(token_file, 'r') as keyfile:
+                api_token = keyfile.readlines()[0].strip().strip('\n')
+
+        return api_token
 
     def set_log_level(self, level):
         self._logger.setLevel(level)

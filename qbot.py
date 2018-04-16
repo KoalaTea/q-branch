@@ -1,15 +1,25 @@
 import threading
 import time
-from slack import SlackBot
-from arsenal_pyclient.arsenal import target
-from arsenal_pyclient.arsenal import action
 
-#TODO config
+from slack import SlackBot
+from fire import Fire
+
+from client import CLI
 
 class QBot(SlackBot):
     watch_timeout = 3
 
+    def __init__(self, **kwargs):
+        """
+        Initialize QBot
+        """
+        self.cli = CLI(api_key_file=kwargs.get('arsenal_token_file'))
+        SlackBot.__init__(self, **kwargs)
+
     def commands(self, command, channel):
+        """
+        Look for commands.
+        """
         if command.startswith('arsenal '):
             # remove arsenal from the command and strip out extra spaces
             command = ' '.join(command.split()[1:]).strip()
@@ -17,99 +27,17 @@ class QBot(SlackBot):
             return self.handle_arsenal_command(command, channel)
 
     def handle_arsenal_command(self, command, channel):
-        command_lower = command.lower()
+        """
+        Handle arsenal commands.
+        """
+        fire.Fire(self.cli, '{}'.format(self._cmd))
 
-        if command_lower.startswith('listtargets'):
-            self._logger.debug('running list targets')
-            answers = []
-            targets = target.ListTargets()
-            for t in targets['targets']:
-                sessions = [s for s in t['sessions'] if s['status'] == 'active']
-                answers.append('*{}* has *{}* active sessions'.format(t['name'], len(sessions)))
-                for interface in t['interfaces'].keys():
-                    answers.append('{}'.format(t['interfaces'][interface]))
-            return '{}'.format('\n'.join(answers))
+        output = '\n'.join(self.cli._output_lines)
+        self.cli._output_lines = []
 
-        elif command_lower.startswith('createaction'):
-            command_list = command.split()
-            if len(command_list) > 2:
-                target_name = command_list[1]
-                return self.create_action(target_name)
-            return 'bad command for CreateAction {}'.format(command) #TODO log how to make command?
+        return output
 
-        elif command_lower.startswith('getaction'):
-            command_list = command.split()
-            if len(command_list) == 2:
-                return self.get_action(command_list[1])
-            return 'bad command for GetAction {}'.format(command)
-
-        elif command_lower.startswith('renametarget'):
-            command_list = command.split()
-            if len(command_list) == 3:
-                data = target.UpdateTargetByName(command_list[1], {'new_name': command_list[2]})
-                if data['status'] != 200:
-                    return 'rename *{} errored* with *{}*'.format(command_list[1], data['message'])
-                return 'renamed *{}* to *{}*'.format(command_list[1], command_list[2])
-
-        elif command_lower.startswith('help'):
-            lines = []
-            lines.append('ListTargets')
-            lines.append('CreateAction <target_name> exec <command>')
-            lines.append('GetAction <action_id>')
-            lines.append('RenameTarger <old_name> <new_name>')
-            return '\n'.join(lines)
-
-    def create_action(self):
-        self._logger.debug('getting target {}'.format(target_name))
-        try:
-            t = target.GetTargetByName(target_name)
-            self._logger.debug('found target {}'.format(t))
-        except:
-            self._logger.debug('target {} does not exist'.format(target_name))
-            return 'target {} does not exist'.format(target_name)
-        if t['target']['name'] is not None:
-            cmd = ' '.join(command_list[2:])
-            data = action.CreateAction(t['target']['name'], cmd)
-            action_id = data['action']['action_id']
-            msg = '*{}* created on target *{}* for command *{}*'.format(action_id,
-                                                                        target_name, cmd)
-            threading.Thread(target=self.watch_for_action,
-                             args=(t, action_id, channel,)).start()
-            return msg
-            #self.send_message(channel, msg)
-
-
-    def get_action(self, action_id):
-        try:
-            data = action.GetAction(action_id)
-        except:
-            return 'action {} does not exist'.format(action_id)
-        a = data['action']
-        response = a['response']
-        if response:
-            if response['error']:
-                return '{} *{}* on *{}*\n*errored* with *{}*'.format(a['action_id'],
-                                                                     a['actionString'],
-                                                                     a['target_name'],
-                                                                     response['stderr'])
-            else:
-                lines = []
-                lines.append('{} *{}* on *{}* has output on'.format(a['action_id'],
-                                                                    a['actionString'],
-                                                                    a['target_name']))
-                lines.append('```{}```'.format(response['stdout']))
-                return '\n'.join(lines)
-        return 'command on *{}* has status *{}*'.format(a['target_name'], a['status'])
-
-
-    def rename_target(self, old_name, new_name):
-        pass
-
-    def watch_for_action(self, target_json, action_id, channel):
-        trys = 0
-        interval = target_json['interval']
-        while trys <= watch_timeout:
-            a = action.GetAction(action_id)
-            if a is not None:
-                if a['status'] != 'sent':
-                    pass
+if __name__ == '__main__':
+    q = QBot(arsenal_token_file='.arsenal_key', slack_token_file='.slack_key')
+    q.set_log_level('DEBUG')
+    q.run()

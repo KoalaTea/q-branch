@@ -1,3 +1,4 @@
 __pycache__
-slack_test.py
+.arsenal_key
+.slack_key
 *.pyc
