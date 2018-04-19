@@ -17,23 +17,21 @@ class SlackBot(object):
     _logger.addHandler(_handler)
     _logger.setLevel('INFO')
 
-    def __init__(self, **kwargs):
-        api_token = self._get_token('slack_token_file', **kwargs)
+    def __init__(self, slack_api_token=None, slack_token_file=None):
+        if slack_api_token is None:
+            slack_api_token = self._get_token(slack_token_file)
 
         # Initialize slack client
-        self.slack_client = SlackClient(api_token)
+        self.slack_client = SlackClient(slack_api_token)
         self._init_bot_id()
 
-    def _get_token(self, token_file=None, **kwargs):
+    def _get_token(self, slack_token_file=None):
         """
-        Attempt to fetch a token based on kwargs.
+        Attempt to fetch a token from a file.
         """
-        # Allow token to be passed as argument
-        api_token = kwargs.get('slack_token')
-
         # Attempt to read token from file
-        if token_file and os.path.exists(token_file):
-            with open(token_file, 'r') as keyfile:
+        if slack_token_file and os.path.exists(slack_token_file):
+            with open(slack_token_file, 'r') as keyfile:
                 api_token = keyfile.readlines()[0].strip().strip('\n')
 
         return api_token

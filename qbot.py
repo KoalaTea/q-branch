@@ -9,12 +9,15 @@ from client import CLI
 class QBot(SlackBot):
     watch_timeout = 3
 
-    def __init__(self, **kwargs):
+    def __init__(self, slack_api_token=None, slack_token_file=None, arsenal_token_file=None):
         """
         Initialize QBot
         """
-        self.cli = CLI(api_key_file=kwargs.get('arsenal_token_file'))
-        SlackBot.__init__(self, **kwargs)
+        self.cli = CLI(api_key_file=arsenal_token_file, enable_color=False)
+        if slack_api_token is not None:
+            SlackBot.__init__(self, slack_api_token=slack_api_token)
+        else:
+            SlackBot.__init__(self, slack_token_file=slack_token_file)
 
     def commands(self, command, channel):
         """
@@ -30,10 +33,14 @@ class QBot(SlackBot):
         """
         Handle arsenal commands.
         """
-        fire.Fire(self.cli, '{}'.format(self._cmd))
+        output = ''
+        try:
+            Fire(self.cli, '{}'.format(command))
 
-        output = '\n'.join(self.cli._output_lines)
-        self.cli._output_lines = []
+            output = '\n'.join(self.cli._output_lines)
+            self.cli._output_lines = []
+        except:
+            output = 'oops That command is not supported'
 
         return output
 
