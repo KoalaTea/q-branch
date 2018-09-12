@@ -2,3 +2,5 @@ __pycache__
 .arsenal_key
 .slack_key
 *.pyc
+.vscode
+.mypy_cache
