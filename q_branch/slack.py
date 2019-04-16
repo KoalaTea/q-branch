@@ -15,11 +15,12 @@ _LOG = logging.getLogger(__name__)
 
 
 class SlackException(Exception):
-    def __init__(self, err):
-        self.err = f"slack api call returned error '{err}'"
+    def __init__(self, api_method, err):
+        self.api_method = api_method
+        self.err = f"{err}"
 
     def __str__(self):
-        return f"SlackException: {self.err}"
+        return f"api call {self.api_method} returned error '{self.err}'"
 
 
 class SlackBot(bot.Bot):
@@ -40,19 +41,15 @@ class SlackBot(bot.Bot):
         self.slack_client = SlackClient(slack_api_token)
         self._init_bot_id()
 
-    def _api_error_check(self, api_response):
-        """ might use this to check errors """
-        if not api_response.get("ok"):
-            error = api_response.get(
+    def _api_call(self, method, **kwargs):
+        """ wrapper function on slack_client.api_call to do error checking """
+        resp = self.slack_client.api_call(method, **kwargs)
+        if not resp.get("ok"):
+            error = resp.get(
                 "error",
                 "ok was false or missing from api_response but no error was included",
             )
-            raise SlackException(error)
-
-    def _api_call(self, *args, **kwargs):
-        """ might use this """
-        resp = self.slack_client.api_call(*args, **kwargs)
-        self._api_error_check(resp)
+            raise SlackException(method, error)
         return resp
 
     def _get_token(self, slack_token_file: str) -> str:
@@ -67,8 +64,7 @@ class SlackBot(bot.Bot):
         return api_token
 
     def _init_bot_id(self) -> None:
-        resp = self._api_call("users.list")
-        users = resp["members"]
+        users = self._api_call("users.list")["members"]
         for user in users:
             if user["name"] == self.username:
                 self.bot_id = user["id"]
@@ -93,13 +89,16 @@ class SlackBot(bot.Bot):
             self.send_message(channel, answer)
 
     def send_message(self, channel: str, msg: str) -> None:
-        self.slack_client.api_call(
-            "chat.postMessage", channel=channel, text=msg, as_user=True
-        )
+        try:
+            self._api_call(
+                "chat.postMessage", channel=channel, text=msg, as_user=True
+            )
+        except SlackException as e:
+            _LOG.exception(e)
 
     def get_user_id(self, username: str) -> Optional[str]:
         """ gets the slack user id from the slack username """
-        users = self.slack_client.api_call("users.list")["members"]
+        users = self._api_call("users.list")["members"]
         for user in users:
             if user["name"] == username:
                 return user["id"]
